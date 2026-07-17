@@ -23,7 +23,7 @@ transcription:
 
 outputs:
   base_dir: "outputs/transcripts_gold"
-  formats: ["txt", "tsv", "json"]
+  formats: ["txt", "tsv", "json", "srt"]
   overwrite: false
   writer_options:
     max_line_width: null
