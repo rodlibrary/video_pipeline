@@ -45,8 +45,8 @@ keyframes:
 
 frame_descriptions:
   enabled: true
-  model: "gpt-4o"
-  api_key_env: "OPENAI_API_KEY"
+  model: "gemini-2.0-flash"
+  api_key_env: "GOOGLE_API_KEY"
   frames_root: "outputs/keyframes_gold"
   output_dir: "outputs/frame_descriptions_gold"
   overwrite: false
@@ -74,8 +74,8 @@ frame_descriptions:
 
 summarization:
   enabled: true
-  model: "gpt-4o"
-  api_key_env: "OPENAI_API_KEY"
+  model: "gemini-2.0-flash"
+  api_key_env: "GOOGLE_API_KEY"
   word_limit: 50
   temperature: 0.2
   transcript_format: "txt"
