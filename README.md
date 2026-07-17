@@ -19,12 +19,12 @@ An HPC-friendly transcription workflow utilizing SLURM and Gemini designed for d
    python3 -m venv .venv && source .venv/bin/activate
    pip install -r requirements.txt
    ```
-2. **Unzip av_pipeline_slurm_chain.zip** alongside run_pipeline.py and config.yaml
+2. **Unzip av_pipeline_slurm_chain.zip alongside run_pipeline.py and config.yaml**
 
 4. **Prepare a configuration**
 
-   # edit config.yaml so the paths match your collection and desired outputs
-   ```
+   edit config.yaml so the paths match your collection and desired outputs
+   
 3. **Launch a transcription run**
 
     ```SLURM
@@ -34,9 +34,9 @@ An HPC-friendly transcription workflow utilizing SLURM and Gemini designed for d
 ./slurm/submit_pipeline.sh config.yaml
    ```
 4. **Notes**
-   Partition names (gpu, compute) and module names in common_env.sh and each stage file are placeholders.
-Per-stage --nodes/--ntasks-per-node are starting points — the Gemini API steps in particular should be tuned down if you hit rate limits, and describe_frames/keyframes sized up if your collection is large.
-transcription.device: "cuda" needs to be set in config.yaml for the GPU request in 01_transcribe.slurm to actually get used.
+   - Partition names (gpu, compute) and module names in common_env.sh and each stage file are placeholders.
+   - Per-stage --nodes/--ntasks-per-node are starting points — the Gemini API steps in particular should be tuned down if you hit rate limits, and describe_frames/keyframes sized up if your collection is large.
+   - transcription.device: "cuda" needs to be set in config.yaml for the GPU request in 01_transcribe.slurm to actually get used.
 
 
 ## Configuration Overview
