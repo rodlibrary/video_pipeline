@@ -36,7 +36,7 @@ An MPI-friendly transcription workflow designed for digital librarians, archivis
    mpirun -np 8 python extract_keyframes.py --config config.yaml
    ```
 
-5. **(Optional) Describe frames with GPT-Vision**
+5. **(Optional) Describe frames with Gemini**
    ```bash
    mpirun -np 8 python describe_frames.py --config config.yaml
    ```
@@ -77,7 +77,7 @@ The YAML file controls several areas:
 | `keyframes` | Optional still-frame extraction settings (modes, intervals, segment parsing, output layout). |
 | `frame_descriptions` | Optional Gemini settings to describe frames, with transcript and metadata context. |
 | `summarization` | Gemini summarization settings, including use of frame descriptions. |
-| `tagging` | GPT-based entity and topic tagging of transcripts. |
+| `tagging` | Gemini-based entity and topic tagging of transcripts. |
 | `collection_reports` | Collection-wide synthesis reports. |
 | `accessibility` | Audio-description narration cues based on transcripts/frames. |
 | `preview_dashboard` | Static HTML preview builder. |
@@ -92,7 +92,7 @@ The YAML file controls several areas:
 See `config-example.yaml` for inline documentation of each field.
 
 ## Gold-Standard Preset
-The repository includes `config-gold-standard.yaml`, a preset that mirrors the original four-stage AI-SummarizeVid workflow (Whisper transcripts, speech + interval keyframes, GPT-Vision descriptions, and 50-word GPT summaries). To use it:
+The repository includes `config-gold-standard.yaml`, a preset that mirrors the original four-stage AI-SummarizeVid workflow (Whisper transcripts, speech + interval keyframes, Gemini descriptions, and 50-word Gemini summaries). To use it:
 
 1. Copy the file to `config.yaml` (or pass it directly via `--config`), then edit `input.media_root` so it points at your collection. Update `metadata_csv` entries if you want metadata-aware prompts.
 2. Set `OPENAI_API_KEY` in your environment before running frame-description or summarization steps.
@@ -101,7 +101,7 @@ The repository includes `config-gold-standard.yaml`, a preset that mirrors the o
    mpirun -np 8 python run_pipeline.py --config config-gold-standard.yaml
    ```
 
-The preset writes transcripts, keyframes, Gemini frame descriptions, and GPT summaries into `outputs/transcripts_gold`, `outputs/keyframes_gold`, `outputs/frame_descriptions_gold`, and `outputs/summaries_gold`, and it enforces 3-second interval sampling (capped at 60 frames) with the published prompt language to ensure behavioral parity.
+The preset writes transcripts, keyframes, Gemini frame descriptions, and Gemini summaries into `outputs/transcripts_gold`, `outputs/keyframes_gold`, `outputs/frame_descriptions_gold`, and `outputs/summaries_gold`, and it enforces 3-second interval sampling (capped at 60 frames) with the published prompt language to ensure behavioral parity.
 
 ## Optional Audio Normalization
 `ffmpeg` preprocessing is helpful when collections contain a patchwork of legacy formats—normalizing sample rate, channel layout, and codecs improves transcription consistency and avoids Whisper’s fallback re-encoding. If your collection is already stored as modern MP4/MKV with AAC stereo audio, you can disable preprocessing to skip that extra I/O.
@@ -112,7 +112,7 @@ The preset writes transcripts, keyframes, Gemini frame descriptions, and GPT sum
 - Descriptions mirror the keyframe directory tree, allowing easy correlation between images and text.
 
 ## Multi-Layer Outputs
-- Configure `summarization` to feed transcripts (and optionally frame descriptions) into concise GPT outputs.
+- Configure `summarization` to feed transcripts (and optionally frame descriptions) into concise Gemini outputs.
 - Enable `tagging`, `collection_reports`, `accessibility`, and `quality_control` to produce structured metadata, narrations, and QA dashboards.
 - `build_preview.py` assembles a static HTML gallery (with optional custom CSS) for quick inspection.
 - `build_iiif_manifest.py` and `export_catalog.py` prepare assets for IIIF viewers and standard catalog systems.
