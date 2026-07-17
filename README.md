@@ -6,7 +6,7 @@ An MPI-friendly transcription workflow designed for digital librarians, archivis
 - **Parallel transcription**: Scan large audio/video collections (optional recursion) and distribute work across MPI ranks.
 - **Optional audio normalization** keeps legacy formats consistent for Whisper ingestion.
 - **Parallel transcription** outputs `txt`, `json`, `tsv`, or `srt`.
-- **Keyframe extraction + GPT-Vision** produces storyboard descriptions of visual content.
+- **Keyframe extraction + Gemini** produces storyboard descriptions of visual content.
 - **Summaries, tags, & accessibility notes** provide layered AI metadata (text + visuals + narration cues).
 - **Collection analytics**: generate research briefings, quality reports, clustering insights, and IIIF manifests.
 - **Discovery outputs**: export catalog-ready CSV, SQLite FTS index, HTML preview dashboard.
@@ -45,7 +45,7 @@ An MPI-friendly transcription workflow designed for digital librarians, archivis
    ```bash
    mpirun -np 8 python summarize_collection.py --config config.yaml
    ```
-   Make sure your OpenAI API key is set (see `summarization.api_key_env` in the config).
+   Make sure your Gemini API key is set (see `summarization.api_key_env` in the config).
 
 7. **Layer in metadata, discovery, and exports**
    ```bash
@@ -75,8 +75,8 @@ The YAML file controls several areas:
 | `transcription` | Whisper model choice, device, language hints, and decoding parameters. |
 | `outputs` | Top-level folder, output formats, and writer options shared across formats. |
 | `keyframes` | Optional still-frame extraction settings (modes, intervals, segment parsing, output layout). |
-| `frame_descriptions` | Optional GPT-Vision settings to describe frames, with transcript and metadata context. |
-| `summarization` | GPT summarization settings, including use of frame descriptions. |
+| `frame_descriptions` | Optional Gemini settings to describe frames, with transcript and metadata context. |
+| `summarization` | Gemini summarization settings, including use of frame descriptions. |
 | `tagging` | GPT-based entity and topic tagging of transcripts. |
 | `collection_reports` | Collection-wide synthesis reports. |
 | `accessibility` | Audio-description narration cues based on transcripts/frames. |
@@ -101,14 +101,14 @@ The repository includes `config-gold-standard.yaml`, a preset that mirrors the o
    mpirun -np 8 python run_pipeline.py --config config-gold-standard.yaml
    ```
 
-The preset writes transcripts, keyframes, GPT frame descriptions, and GPT summaries into `outputs/transcripts_gold`, `outputs/keyframes_gold`, `outputs/frame_descriptions_gold`, and `outputs/summaries_gold`, and it enforces 3-second interval sampling (capped at 60 frames) with the published prompt language to ensure behavioral parity.
+The preset writes transcripts, keyframes, Gemini frame descriptions, and GPT summaries into `outputs/transcripts_gold`, `outputs/keyframes_gold`, `outputs/frame_descriptions_gold`, and `outputs/summaries_gold`, and it enforces 3-second interval sampling (capped at 60 frames) with the published prompt language to ensure behavioral parity.
 
 ## Optional Audio Normalization
 `ffmpeg` preprocessing is helpful when collections contain a patchwork of legacy formats—normalizing sample rate, channel layout, and codecs improves transcription consistency and avoids Whisper’s fallback re-encoding. If your collection is already stored as modern MP4/MKV with AAC stereo audio, you can disable preprocessing to skip that extra I/O.
 
 ## Keyframes & Vision Descriptions
 - Enable the `keyframes` section to sample stills at regular intervals, per speech segment, or both. Outputs live under `keyframes/<mode>/...`.
-- Turn on `frame_descriptions` to send each still to a vision-capable GPT model (e.g., `gpt-4o`). Prompts can include transcript excerpts and metadata for richer, neutral descriptions.
+- Turn on `frame_descriptions` to send each still to a vision-capable Gemini model. Prompts can include transcript excerpts and metadata for richer, neutral descriptions.
 - Descriptions mirror the keyframe directory tree, allowing easy correlation between images and text.
 
 ## Multi-Layer Outputs
