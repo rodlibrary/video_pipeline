@@ -15,14 +15,14 @@ An HPC-friendly transcription workflow designed for digital librarians, archivis
 ## Quick Start
 1. **Install System dependencies**
 
-   mpi4py>=3.1
-   whisperx>
-   PyYAML>=6.0
-   numpy>=1.24
-   google-genai
-   scikit-learn>=1.3
-   jinja2>=3.1
-   pandas>=1.5
+  * mpi4py>=3.1
+  * whisperx (requires Hugging Face token)
+  * PyYAML>=6.0
+  * numpy>=1.24
+  * google-genai (requires API Key and tokens)
+  * scikit-learn>=1.3
+  * jinja2>=3.1
+  * pandas>=1.5
 
 2. Unzip av_pipeline_slurm_chain.zip alongside run_pipeline.py and config.yaml
 
