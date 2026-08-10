@@ -24,7 +24,7 @@ A high performance cluster configured and MPI-friendly transcription workflow de
   * jinja2>=3.1
   * pandas>=1.5
 
-2. Unzip `av_pipeline_slurm_chain.zip` alongside `run_pipeline.py` and `config.yaml`
+2. **Unzip `av_pipeline_slurm_chain.zip` alongside `run_pipeline.py` and `config.yaml`**
 
 Contents:
 * `common_env.sh`              # shared module loads, env activation, GOOGLE_API_KEY loading — sourced by every stage
@@ -43,7 +43,8 @@ Contents:
 * `13_clustering.slurm`        # single task — Gemini embeddings, batched internally
 * `submit_pipeline.sh`         # driver: submits the chain with --dependency=afterok
 
-## Configuration Overview
+Configuration Overview
+
 The YAML file controls several areas:
 
 | Section | Purpose |
@@ -67,7 +68,7 @@ The YAML file controls several areas:
 | `workflow` | Ordered pipeline steps for `run_pipeline.py`. |
 | `logging` | Verbosity controls and how often to print progress. |
 
-3. Orchestrate everything
+**3. Orchestrate everything**
 
 chmod +x slurm/*.sh slurm/*.slurm
 
@@ -77,8 +78,8 @@ Each stage only runs after the previous one exits successfully (afterok), and ea
 
 Two extras built into the driver:
 
-* Skip stages you've already run: SKIP_STEPS="transcribe keyframes" ./slurm/submit_pipeline.sh config.yaml
-* Run only a subset: ONLY_STEPS="describe_frames summarize" ./slurm/submit_pipeline.sh config.yaml
+* Skip stages you've already run: `SKIP_STEPS="transcribe keyframes" ./slurm/submit_pipeline.sh config.yaml`
+* Run only a subset: `ONLY_STEPS="describe_frames summarize" ./slurm/submit_pipeline.sh config.yaml`
 
 A few things to tune for your actual cluster before submitting:
 
