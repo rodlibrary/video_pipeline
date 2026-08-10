@@ -68,7 +68,9 @@ The YAML file controls several areas:
 | `logging` | Verbosity controls and how often to print progress. |
 
 3. Orchestrate everything
+
 chmod +x slurm/*.sh slurm/*.slurm
+
 ./slurm/submit_pipeline.sh config.yaml
 
 Each stage only runs after the previous one exits successfully (afterok), and each requests its own resources — GPU for transcription, wide CPU fan-out for ffmpeg, dialed-back concurrency for the Gemini API steps — instead of one job sized for the whole workflow.
@@ -80,6 +82,6 @@ Two extras built into the driver:
 
 A few things to tune for your actual cluster before submitting:
 
-* Partition names (gpu, compute) and module names in common_env.sh and each stage file are placeholders.
-*Per-stage --nodes/--ntasks-per-node are starting points — the Gemini API steps in particular should be tuned down if you hit rate limits, and describe_frames/keyframes sized up if your collection is large.
-* transcription.device: "cuda" needs to be set in config.yaml for the GPU request in 01_transcribe.slurm to actually get used.
+* Partition names (`gpu`, `compute`) and module names in `common_env.sh` and each stage file are placeholders.
+*Per-stage `--nodes`/`--ntasks-per-node` are starting points — the Gemini API steps in particular should be tuned down if you hit rate limits, and `describe_frames/keyframes` sized up if your collection is large.
+* `transcription.device: "cuda"` needs to be set in `config.yaml` for the GPU request in `01_transcribe.slurm` to actually get used.
