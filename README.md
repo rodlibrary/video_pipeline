@@ -13,7 +13,7 @@ An HPC-friendly transcription workflow designed for digital librarians, archivis
 - **Workflow automation**: `submit_pipeline.py` sequences steps with provenance logs.
 
 ## Quick Start
-1. **Install System dependencies**
+1. **Install dependencies**
 
   * mpi4py>=3.1
   * whisperx (requires Hugging Face token)
