@@ -1,6 +1,6 @@
 # Parallel AV Transcription Toolkit
 
-An MPI-friendly transcription workflow designed for digital librarians, archivists, curators, and developers who manage large audiovisual collections. The toolkit builds on `https://github.com/BreuerLabs/AI-SummarizeVid` 
+An HPC-friendly transcription workflow designed for digital librarians, archivists, curators, and developers who manage large audiovisual collections. The toolkit builds on `https://github.com/BreuerLabs/AI-SummarizeVid` 
 
 ## What This Provides
 - **Parallel transcription**: Scan large audio/video collections (optional recursion) and distribute work across MPI ranks.
@@ -20,49 +20,31 @@ An MPI-friendly transcription workflow designed for digital librarians, archivis
    pip install -r requirements.txt
    ```
 
-2. **Prepare a configuration**
-   ```bash
-   cp config-example.yaml config.yaml
-   # edit config.yaml so the paths match your collection and desired outputs
-   ```
+2. Unzip av_pipeline_slurm_chain.zip alongside run_pipeline.py and config.yaml
 
-3. **Launch a transcription run**
-   ```bash
-   mpirun -np 8 python transcribe_collection.py --config config.yaml
-   ```
+Contents:
+common_env.sh              # shared module loads, env activation, GOOGLE_API_KEY loading — sourced by every stage
+01_transcribe.slurm        # GPU, 2 nodes x 1 task (one Whisper instance per GPU)
+02_keyframes.slurm         # CPU, 4 nodes x 16 tasks (ffmpeg fans out cheaply)
+03_describe_frames.slurm   # CPU, 2 nodes x 4 tasks (Gemini Vision — kept modest for rate limits)
+04_summarize.slurm         # CPU, 1 node x 8 tasks (Gemini text)
+05_tags.slurm              # CPU, 1 node x 8 tasks (Gemini text)
+06_accessibility.slurm     # CPU, 1 node x 8 tasks (Gemini text)
+07_collection_report.slurm # single task — not rank-aware
+08_preview.slurm           # single task — no API calls
+09_quality_metrics.slurm   # single task — no API calls
+10_iiif.slurm              # single task — no API calls
+11_catalog_export.slurm    # single task — no API calls
+12_search_index.slurm      # single task — no API calls
+13_clustering.slurm        # single task — Gemini embeddings, batched internally
+submit_pipeline.sh         # driver: submits the chain with --dependency=afterok
 
-4. **(Optional) Extract keyframes**
-   ```bash
-   mpirun -np 8 python extract_keyframes.py --config config.yaml
-   ```
 
-5. **(Optional) Describe frames with Gemini**
+3. Orchestrate everything
    ```bash
-   mpirun -np 8 python describe_frames.py --config config.yaml
-   ```
+   chmod +x slurm/*.sh slurm/*.slurm
+./slurm/submit_pipeline.sh config.yaml
 
-6. **(Optional) Launch summarization**
-   ```bash
-   mpirun -np 8 python summarize_collection.py --config config.yaml
-   ```
-   Make sure your Gemini API key is set (see `summarization.api_key_env` in the config).
-
-7. **Layer in metadata, discovery, and exports**
-   ```bash
-   mpirun -np 8 python generate_tags.py --config config.yaml
-   mpirun -np 8 python generate_accessibility.py --config config.yaml
-   python collection_report.py --config config.yaml
-   python build_preview.py --config config.yaml
-   python quality_metrics.py --config config.yaml
-   python build_iiif_manifest.py --config config.yaml
-   python export_catalog.py --config config.yaml
-   python build_search_index.py --config config.yaml
-   python cluster_visuals.py --config config.yaml
-   ```
-
-8. **Orchestrate everything**
-   ```bash
-   python run_pipeline.py --config config.yaml
    ```
 
 ## Configuration Overview
