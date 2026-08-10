@@ -14,8 +14,8 @@ An HPC-friendly transcription workflow designed for digital librarians, archivis
 
 ## Quick Start
 1. **Install System dependencies (install separately)**
-   # - ffmpeg
-   # - OpenMPI (for mpi4py / mpirun)
+   ffmpeg
+   OpenMPI (for mpi4py / mpirun)
    numpy==1.26.4
    pandas==2.2.3
    mpi4py==3.1.6
