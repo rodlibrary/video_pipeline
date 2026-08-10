@@ -12,7 +12,7 @@ A high performance cluster configured and MPI-friendly transcription workflow de
 - **Discovery outputs**: export catalog-ready CSV, SQLite FTS index, HTML preview dashboard.
 - **Workflow automation**: `submit_pipeline.py` sequences steps with provenance logs.
 
-## Quick Start
+## Steps
 1. **Install dependencies**
 
   * mpi4py>=3.1
