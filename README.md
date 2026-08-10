@@ -10,7 +10,7 @@ An HPC-friendly transcription workflow designed for digital librarians, archivis
 - **Summaries, tags, & accessibility notes** provide layered AI metadata (text + visuals + narration cues).
 - **Collection analytics**: generate research briefings, quality reports, clustering insights, and IIIF manifests.
 - **Discovery outputs**: export catalog-ready CSV, SQLite FTS index, HTML preview dashboard.
-- **Workflow automation**: `run_pipeline.py` sequences steps with provenance logs; `configure_tool.py` bootstraps configs interactively.
+- **Workflow automation**: `submit_pipeline.py` sequences steps with provenance logs.
 
 ## Quick Start
 1. **Install System dependencies**
