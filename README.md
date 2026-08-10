@@ -28,20 +28,20 @@ An HPC-friendly transcription workflow designed for digital librarians, archivis
 
 Contents:
 * common_env.sh              # shared module loads, env activation, GOOGLE_API_KEY loading — sourced by every stage
-* 01_transcribe.slurm        # GPU, 2 nodes x 1 task (one Whisper instance per GPU)
-* 02_keyframes.slurm         # CPU, 4 nodes x 16 tasks (ffmpeg fans out cheaply)
-* 03_describe_frames.slurm   # CPU, 2 nodes x 4 tasks (Gemini Vision — kept modest for rate limits)
-* 04_summarize.slurm         # CPU, 1 node x 8 tasks (Gemini text)
-* 05_tags.slurm              # CPU, 1 node x 8 tasks (Gemini text)
-* 06_accessibility.slurm     # CPU, 1 node x 8 tasks (Gemini text)
-* 07_collection_report.slurm # single task — not rank-aware
-* 08_preview.slurm           # single task — no API calls
-* 09_quality_metrics.slurm   # single task — no API calls
-* 10_iiif.slurm              # single task — no API calls
-* 11_catalog_export.slurm    # single task — no API calls
-* 12_search_index.slurm      # single task — no API calls
-* 13_clustering.slurm        # single task — Gemini embeddings, batched internally
-* submit_pipeline.sh         # driver: submits the chain with --dependency=afterok
+* `01_transcribe.slurm`        # GPU, 2 nodes x 1 task (one Whisper instance per GPU)
+* `02_keyframes.slurm`         # CPU, 4 nodes x 16 tasks (ffmpeg fans out cheaply)
+* `03_describe_frames.slurm`   # CPU, 2 nodes x 4 tasks (Gemini Vision — kept modest for rate limits)
+* `04_summarize.slurm`         # CPU, 1 node x 8 tasks (Gemini text)
+* `05_tags.slurm`              # CPU, 1 node x 8 tasks (Gemini text)
+* `06_accessibility.slurm`     # CPU, 1 node x 8 tasks (Gemini text)
+* `07_collection_report.slurm` # single task — not rank-aware
+* `08_preview.slurm`          # single task — no API calls
+* `09_quality_metrics.slurm`   # single task — no API calls
+* `10_iiif.slurm`              # single task — no API calls
+* `11_catalog_export.slurm`    # single task — no API calls
+* `12_search_index.slurm`      # single task — no API calls
+* `13_clustering.slurm`        # single task — Gemini embeddings, batched internally
+* `submit_pipeline.sh`         # driver: submits the chain with --dependency=afterok
 
 ## Configuration Overview
 The YAML file controls several areas:
