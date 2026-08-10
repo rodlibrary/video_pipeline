@@ -70,9 +70,9 @@ The YAML file controls several areas:
 
 **3. Orchestrate everything**
 
-chmod +x slurm/*.sh slurm/*.slurm
+`chmod +x slurm/*.sh slurm/*.slurm`
 
-./slurm/submit_pipeline.sh config.yaml
+`./slurm/submit_pipeline.sh config.yaml`
 
 Each stage only runs after the previous one exits successfully (afterok), and each requests its own resources — GPU for transcription, wide CPU fan-out for ffmpeg, dialed-back concurrency for the Gemini API steps — instead of one job sized for the whole workflow.
 
