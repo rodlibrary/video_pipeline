@@ -2,7 +2,7 @@
 
 An HPC-friendly transcription workflow designed for digital librarians, archivists, curators, and developers who manage large audiovisual collections. The toolkit builds on `https://github.com/BreuerLabs/AI-SummarizeVid` 
 
-## What This Provides
+## What this provides
 - **Parallel transcription**: Scan large audio/video collections (optional recursion) and distribute work across MPI ranks.
 - **Optional audio normalization** keeps legacy formats consistent for WhisperX ingestion.
 - **Parallel transcription** outputs `txt`, `json`, `tsv`, or `srt`.
@@ -14,6 +14,7 @@ An HPC-friendly transcription workflow designed for digital librarians, archivis
 
 ## Quick Start
 1. **Install System dependencies**
+
    mpi4py>=3.1
    whisperx>
    PyYAML>=6.0
@@ -65,16 +66,6 @@ The YAML file controls several areas:
 | `clustering` | Visual theme clustering (text embeddings + k-means). |
 | `workflow` | Ordered pipeline steps for `run_pipeline.py`. |
 | `logging` | Verbosity controls and how often to print progress. |
-
-3. Orchestrate everything
-   ```bash
-   chmod +x slurm/*.sh slurm/*.slurm
-./slurm/submit_pipeline.sh config.yaml
-
-3. Orchestrate everything
-   ```bash
-   chmod +x slurm/*.sh slurm/*.slurm
-./slurm/submit_pipeline.sh config.yaml
 
 3. Orchestrate everything
    ```bash
