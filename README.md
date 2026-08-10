@@ -27,7 +27,7 @@ A high performance cluster configured and MPI-friendly transcription workflow de
 2. Unzip `av_pipeline_slurm_chain.zip` alongside `run_pipeline.py` and `config.yaml`
 
 Contents:
-* common_env.sh              # shared module loads, env activation, GOOGLE_API_KEY loading — sourced by every stage
+* `common_env.sh`              # shared module loads, env activation, GOOGLE_API_KEY loading — sourced by every stage
 * `01_transcribe.slurm`        # GPU, 2 nodes x 1 task (one Whisper instance per GPU)
 * `02_keyframes.slurm`         # CPU, 4 nodes x 16 tasks (ffmpeg fans out cheaply)
 * `03_describe_frames.slurm`   # CPU, 2 nodes x 4 tasks (Gemini Vision — kept modest for rate limits)
