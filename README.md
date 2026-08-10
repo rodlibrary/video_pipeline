@@ -1,6 +1,6 @@
 # Parallel AV Transcription Toolkit
 
-A high performance cluster configured transcription workflow designed for digital librarians, archivists, curators, and developers who manage large audiovisual collections. The toolkit builds on `[https://github.com/mbutler/archive_to_access)` 
+A high performance cluster configured and MPI-friendly transcription workflow designed for digital librarians, archivists, curators, and developers who manage large audiovisual collections. The toolkit builds on `https://github.com/mbutler/archive_to_access` 
 
 ## What this provides
 - **Parallel transcription**: Scan large audio/video collections (optional recursion) and distribute work across MPI ranks.
