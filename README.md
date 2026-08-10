@@ -4,7 +4,7 @@ An HPC-friendly transcription workflow designed for digital librarians, archivis
 
 ## What This Provides
 - **Parallel transcription**: Scan large audio/video collections (optional recursion) and distribute work across MPI ranks.
-- **Optional audio normalization** keeps legacy formats consistent for Whisper ingestion.
+- **Optional audio normalization** keeps legacy formats consistent for WhisperX ingestion.
 - **Parallel transcription** outputs `txt`, `json`, `tsv`, or `srt`.
 - **Keyframe extraction + Gemini** produces storyboard descriptions of visual content.
 - **Summaries, tags, & accessibility notes** provide layered AI metadata (text + visuals + narration cues).
@@ -13,16 +13,15 @@ An HPC-friendly transcription workflow designed for digital librarians, archivis
 - **Workflow automation**: `run_pipeline.py` sequences steps with provenance logs; `configure_tool.py` bootstraps configs interactively.
 
 ## Quick Start
-1. **Install System dependencies (install separately)**
-   ffmpeg
-   OpenMPI (for mpi4py / mpirun)
-   numpy==1.26.4
-   pandas==2.2.3
-   mpi4py==3.1.6
+1. **Install System dependencies**
+   mpi4py>=3.1
+   whisperx>
+   PyYAML>=6.0
+   numpy>=1.24
    google-genai
-   whixperx
-   jiwer==3.0.5
-   num2words==0.5.13
+   scikit-learn>=1.3
+   jinja2>=3.1
+   pandas>=1.5
 
 2. Unzip av_pipeline_slurm_chain.zip alongside run_pipeline.py and config.yaml
 
@@ -42,14 +41,6 @@ common_env.sh              # shared module loads, env activation, GOOGLE_API_KEY
 12_search_index.slurm      # single task — no API calls
 13_clustering.slurm        # single task — Gemini embeddings, batched internally
 submit_pipeline.sh         # driver: submits the chain with --dependency=afterok
-
-
-3. Orchestrate everything
-   ```bash
-   chmod +x slurm/*.sh slurm/*.slurm
-./slurm/submit_pipeline.sh config.yaml
-
-   ```
 
 ## Configuration Overview
 The YAML file controls several areas:
@@ -75,57 +66,30 @@ The YAML file controls several areas:
 | `workflow` | Ordered pipeline steps for `run_pipeline.py`. |
 | `logging` | Verbosity controls and how often to print progress. |
 
-See `config-example.yaml` for inline documentation of each field.
-
-## Gold-Standard Preset
-The repository includes `config-gold-standard.yaml`, a preset that mirrors the original four-stage AI-SummarizeVid workflow (Whisper transcripts, speech + interval keyframes, Gemini descriptions, and 50-word Gemini summaries). To use it:
-
-1. Copy the file to `config.yaml` (or pass it directly via `--config`), then edit `input.media_root` so it points at your collection. Update `metadata_csv` entries if you want metadata-aware prompts.
-2. Set `OPENAI_API_KEY` in your environment before running frame-description or summarization steps.
-3. Launch the end-to-end run:
+3. Orchestrate everything
    ```bash
-   mpirun -np 8 python run_pipeline.py --config config-gold-standard.yaml
-   ```
+   chmod +x slurm/*.sh slurm/*.slurm
+./slurm/submit_pipeline.sh config.yaml
 
-The preset writes transcripts, keyframes, Gemini frame descriptions, and Gemini summaries into `outputs/transcripts_gold`, `outputs/keyframes_gold`, `outputs/frame_descriptions_gold`, and `outputs/summaries_gold`, and it enforces 3-second interval sampling (capped at 60 frames) with the published prompt language to ensure behavioral parity.
+3. Orchestrate everything
+   ```bash
+   chmod +x slurm/*.sh slurm/*.slurm
+./slurm/submit_pipeline.sh config.yaml
 
-## Optional Audio Normalization
-`ffmpeg` preprocessing is helpful when collections contain a patchwork of legacy formats—normalizing sample rate, channel layout, and codecs improves transcription consistency and avoids Whisper’s fallback re-encoding. If your collection is already stored as modern MP4/MKV with AAC stereo audio, you can disable preprocessing to skip that extra I/O.
+3. Orchestrate everything
+   ```bash
+   chmod +x slurm/*.sh slurm/*.slurm
+./slurm/submit_pipeline.sh config.yaml
 
-## Keyframes & Vision Descriptions
-- Enable the `keyframes` section to sample stills at regular intervals, per speech segment, or both. Outputs live under `keyframes/<mode>/...`.
-- Turn on `frame_descriptions` to send each still to a vision-capable Gemini model. Prompts can include transcript excerpts and metadata for richer, neutral descriptions.
-- Descriptions mirror the keyframe directory tree, allowing easy correlation between images and text.
+Each stage only runs after the previous one exits successfully (afterok), and each requests its own resources — GPU for transcription, wide CPU fan-out for ffmpeg, dialed-back concurrency for the Gemini API steps — instead of one job sized for the whole workflow.
 
-## Multi-Layer Outputs
-- Configure `summarization` to feed transcripts (and optionally frame descriptions) into concise Gemini outputs.
-- Enable `tagging`, `collection_reports`, `accessibility`, and `quality_control` to produce structured metadata, narrations, and QA dashboards.
-- `build_preview.py` assembles a static HTML gallery (with optional custom CSS) for quick inspection.
-- `build_iiif_manifest.py` and `export_catalog.py` prepare assets for IIIF viewers and standard catalog systems.
-- `build_search_index.py` creates a SQLite FTS database that you can query with SQL or wrap in a simple API.
-- `cluster_visuals.py` uses OpenAI embeddings + k-means to group similar frame descriptions, helping surface recurring visuals.
-- `run_pipeline.py` ties it all together with provenance logging; `configure_tool.py` lets new users bootstrap configs interactively.
+Two extras built into the driver:
 
-## Output Layout
-The script creates (and reuses) subdirectories inside `outputs.base_dir`, one per requested format:
+* Skip stages you've already run: SKIP_STEPS="transcribe keyframes" ./slurm/submit_pipeline.sh config.yaml
+* Run only a subset: ONLY_STEPS="describe_frames summarize" ./slurm/submit_pipeline.sh config.yaml
 
-```
-transcripts/
-  txt/
-  srt/
-  json/
-  tsv/
-```
+A few things to tune for your actual cluster before submitting:
 
-Filenames mirror the relative path of each media asset with directory separators replaced by `__`. This keeps outputs unique, even when the source collection contains identical filenames in different folders.
-
-## Scaling Tips
-- MPI scaling is roughly linear up to saturated disk or network throughput; use `np.array_split` across ranks to balance workloads.
-- Use `mpirun -np <N> ...` on a single machine for light collections or distribute across cluster nodes if your environment provides a shared filesystem.
-- Whisper models are GPU-accelerated when `device` is set to `cuda` and a compatible GPU is available; otherwise they run on CPU.
-
-## Extending the Workflow
-- Swap Whisper model sizes (`base`, `small`, `medium`, `large-v3`) in the config to balance quality and runtime.
-- Feed the generated transcripts into your own discovery interfaces or cataloging systems.
-- Enable the gold-standard preset when you want the full storyboard + summary flow from the published AI-SummarizeVid workflow.
-
+* Partition names (gpu, compute) and module names in common_env.sh and each stage file are placeholders.
+*Per-stage --nodes/--ntasks-per-node are starting points — the Gemini API steps in particular should be tuned down if you hit rate limits, and describe_frames/keyframes sized up if your collection is large.
+* transcription.device: "cuda" needs to be set in config.yaml for the GPU request in 01_transcribe.slurm to actually get used.
