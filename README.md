@@ -13,12 +13,16 @@ An HPC-friendly transcription workflow designed for digital librarians, archivis
 - **Workflow automation**: `run_pipeline.py` sequences steps with provenance logs; `configure_tool.py` bootstraps configs interactively.
 
 ## Quick Start
-1. **Install prerequisites**
-   ```bash
-   brew install ffmpeg open-mpi        # macOS example
-   python3 -m venv .venv && source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
+1. **Install System dependencies (install separately)**
+   # - ffmpeg
+   # - OpenMPI (for mpi4py / mpirun)
+   numpy==1.26.4
+   pandas==2.2.3
+   mpi4py==3.1.6
+   google-genai
+   whixperx
+   jiwer==3.0.5
+   num2words==0.5.13
 
 2. Unzip av_pipeline_slurm_chain.zip alongside run_pipeline.py and config.yaml
 
