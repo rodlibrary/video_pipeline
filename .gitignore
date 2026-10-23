@@ -9,3 +9,4 @@ local/output/
 cluster/config.yaml
 cluster/logs/
 output/
+pytest-results.xml
