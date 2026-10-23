@@ -231,7 +231,15 @@ def extract_frame(
         "1",
     ]
     if image_ext.lower() in {"jpg", "jpeg"}:
-        cmd.extend(["-qscale:v", str(jpeg_quality)])
+        # JPEG stores full-range colour. Video is usually limited range, which
+        # ffmpeg 8's JPEG encoder rejects (older versions converted silently),
+        # so convert explicitly.
+        cmd.extend([
+            "-vf", "scale=out_range=full",
+            "-pix_fmt", "yuv420p",
+            "-color_range", "pc",
+            "-qscale:v", str(jpeg_quality),
+        ])
     cmd.extend(additional_args)
     # Writing one image to a plain file name (no %d pattern) needs -update 1 on
     # recent ffmpeg; older versions accept the flag too.
