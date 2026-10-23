@@ -1,18 +1,18 @@
 """Run the AV pipeline locally from a terminal.
 
-Examples:
-    python run_pipeline.py --config config.yaml           # run workflow.steps from the config
-    python run_pipeline.py --list                         # show steps and whether each is enabled
-    python run_pipeline.py --steps transcribe keyframes   # run only these steps
-    python run_pipeline.py --skip transcribe              # run everything except transcription
-    python run_pipeline.py --check                        # only check prerequisites
+Examples (from the repository root):
+    python pipeline/run_pipeline.py --config local/config.yaml           # run the enabled steps
+    python pipeline/run_pipeline.py --config local/config.yaml --list    # show steps and status
+    python pipeline/run_pipeline.py --config local/config.yaml --check   # only check prerequisites
+    python pipeline/run_pipeline.py --config local/config.yaml --steps transcribe keyframes
+    python pipeline/run_pipeline.py --config local/config.yaml --skip transcribe
 
 Each step runs as its own Python process (the same interpreter that runs this
 script), one after another. Relative paths in the config are resolved against
 the folder that contains the config file, so you can run this from anywhere.
 
-Cluster users can still fan steps out over MPI with ``--mpi --ranks N``
-(requires ``mpi4py`` and an MPI installation).
+On a cluster, steps can fan out over MPI with ``--mpi --ranks N`` (requires
+``mpi4py``); see cluster/README.md. Inside a SLURM job this happens automatically.
 """
 
 import argparse
@@ -67,6 +67,12 @@ STEP_PYTHON_DEPS = {
     "quality_metrics": [("pandas", "pandas")],
     "clustering": [("openai", "openai"), ("sklearn", "scikit-learn")],
 }
+
+
+def default_config_path() -> str:
+    if os.path.isfile("config.yaml"):
+        return "config.yaml"
+    return os.path.join(os.path.dirname(SCRIPT_ROOT), "local", "config.yaml")
 
 
 def load_config(path: str) -> Dict:
@@ -207,7 +213,11 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Steps: " + ", ".join(PIPELINE_STEPS),
     )
-    parser.add_argument("--config", default="config.yaml", help="YAML config file (default: ./config.yaml).")
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="YAML config file (default: ./config.yaml if present, otherwise local/config.yaml).",
+    )
     parser.add_argument("--steps", nargs="+", metavar="STEP", help="Run only these steps, in this order.")
     parser.add_argument("--skip", nargs="+", metavar="STEP", help="Skip these steps.")
     parser.add_argument("--list", action="store_true", help="List steps and whether each is enabled, then exit.")
@@ -220,12 +230,12 @@ def main() -> None:
     parser.add_argument("--no-mpi", action="store_true", help="Never use mpirun, even inside a SLURM job.")
     args = parser.parse_args()
 
-    config_path = os.path.abspath(os.path.expanduser(args.config))
+    config_path = os.path.abspath(os.path.expanduser(args.config or default_config_path()))
     if not os.path.isfile(config_path):
-        example = os.path.join(SCRIPT_ROOT, "config-local.yaml")
+        example = os.path.join(os.path.dirname(SCRIPT_ROOT), "local", "config.example.yaml")
         sys.exit(
             f"Config file not found: {config_path}\n"
-            f"Start from the local template:  cp {example} config.yaml",
+            f"Start from the local template:  cp {example} {config_path}",
         )
     config_dir = os.path.dirname(config_path)
     try:
@@ -252,7 +262,10 @@ def main() -> None:
                     "See --list for how to enable them.", "33"))
 
     if not runnable:
-        sys.exit("No enabled steps to run. Use --list to see which steps are enabled.")
+        # Not an error: in a SLURM afterok chain a non-zero exit here would cancel
+        # every later job just because this step is switched off.
+        print("[run_pipeline] No enabled steps to run. Use --list to see which steps are enabled.")
+        return
 
     # Inside a SLURM job (e.g. the scripts in av_pipeline_slurm_chain.zip), keep the
     # original behaviour of launching steps with mpirun unless --no-mpi is given.

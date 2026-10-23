@@ -17,8 +17,9 @@ import pytest
 import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PIPELINE = os.path.join(REPO, "pipeline")
 SUPPORT = os.path.join(REPO, "tests", "support")
-sys.path.insert(0, REPO)
+sys.path.insert(0, PIPELINE)
 sys.path.insert(0, SUPPORT)
 
 from fake_llm_server import start_server  # noqa: E402
@@ -44,7 +45,7 @@ def run_pipeline(project, *args, extra_env=None):
     env["NO_COLOR"] = "1"
     env.update(extra_env or {})
     return subprocess.run(
-        [sys.executable, os.path.join(REPO, "run_pipeline.py"), "--config", "config.yaml", *args],
+        [sys.executable, os.path.join(PIPELINE, "run_pipeline.py"), "--config", "config.yaml", *args],
         cwd=project, env=env, capture_output=True, text=True, timeout=600,
     )
 
@@ -65,7 +66,7 @@ def make_media(media_dir):
 
 
 def write_config(project, base_url, enable_all=True):
-    with open(os.path.join(REPO, "config-local.yaml"), encoding="utf-8") as handle:
+    with open(os.path.join(REPO, "local", "config.example.yaml"), encoding="utf-8") as handle:
         cfg = yaml.safe_load(handle)
     cfg["transcription"]["model"] = "tiny"
     cfg["keyframes"]["interval_seconds"] = 5.0

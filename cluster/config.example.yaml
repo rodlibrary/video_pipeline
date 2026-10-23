@@ -1,3 +1,18 @@
+###############################################################################
+# Cluster (SLURM + MPI) configuration
+#
+#   cp cluster/config.example.yaml cluster/config.yaml
+#   cluster/slurm/submit_pipeline.sh                 # uses cluster/config.yaml
+#
+# Relative paths below are resolved against the folder this file lives in
+# (cluster/). On shared filesystems, absolute paths for media_root and the
+# output folders are usually clearer.
+#
+# Every section except transcription is off by default; set `enabled: true`
+# on the steps you want. Steps left disabled are skipped automatically.
+# Set transcription.device: "cuda" so 01_transcribe.slurm's GPU is used.
+###############################################################################
+
 # Where to find media and which files to include
 input:
   media_root: "/path/to/your/media"        # absolute or relative path to the AV collection
@@ -247,7 +262,7 @@ summarization:
   transcript_format: "txt"                 # which transcript format to read ('txt', 'json', etc.)
   transcripts_subdir: null                 # override auto-detected transcript directory (optional)
   max_transcript_chars: 12000              # truncate very long transcripts before summarization
-  output_dir: "summaries"                  # written alongside outputs.base_dir if relative
+  output_dir: "summaries"                  # relative to this config file's folder
   overwrite: false                         # skip summaries that already exist
   api_key_env: "OPENAI_API_KEY"            # environment variable that holds your API key
   metadata_csv: null                       # optional CSV with contextual columns

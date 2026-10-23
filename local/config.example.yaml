@@ -1,11 +1,14 @@
 ###############################################################################
 # Local (single-machine) configuration
 #
-#   cp config-local.yaml config.yaml
-#   python run_pipeline.py --list        # see what will run
-#   python run_pipeline.py               # run it
+# From the repository root:
+#   cp local/config.example.yaml local/config.yaml
+#   python pipeline/run_pipeline.py --config local/config.yaml --list   # see what will run
+#   python pipeline/run_pipeline.py --config local/config.yaml          # run it
 #
-# Relative paths below are resolved against the folder this file lives in.
+# Relative paths below are resolved against the folder this file lives in,
+# so with the defaults your media goes in local/media/ and results land in
+# local/output/.
 #
 # Out of the box this runs the steps that need no API key:
 #   transcribe -> keyframes -> preview -> iiif
@@ -18,7 +21,7 @@
 
 # Where to find media and which files to include
 input:
-  media_root: "media"                      # put your video/audio files in ./media (or use an absolute path)
+  media_root: "media"                      # local/media (or an absolute path to your collection)
   include_extensions: [".mp4", ".mov", ".mkv", ".avi", ".webm", ".mpg", ".mpeg", ".mp3", ".wav", ".m4a", ".flac"]
   recurse: true                            # also scan subfolders
 
