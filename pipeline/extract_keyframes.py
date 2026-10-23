@@ -12,7 +12,9 @@ from typing import Dict, Iterable, List, Sequence, Tuple
 
 import numpy as np
 import yaml
-from mpi4py import MPI
+from pipeline_common import finish_stage, get_comm
+
+AUDIO_ONLY_EXTENSIONS = {".mp3", ".wav", ".m4a", ".flac", ".aac", ".ogg", ".opus", ".wma", ".aif", ".aiff"}
 
 
 def expand_path(path: str) -> str:
@@ -95,6 +97,8 @@ def discover_media_files(cfg: Dict) -> List[str]:
             if os.path.isfile(fpath) and os.path.splitext(fname)[1].lower() in exts:
                 filepaths.append(fpath)
 
+    # Audio-only files have no frames to extract; skip them instead of reporting errors.
+    filepaths = [p for p in filepaths if os.path.splitext(p)[1].lower() not in AUDIO_ONLY_EXTENSIONS]
     filepaths.sort()
     return filepaths
 
@@ -134,7 +138,10 @@ def generate_interval_timestamps(duration: float, cfg: Dict) -> List[float]:
     max_frames = cfg.get("max_interval_frames")
     times = []
     current = interval
-    while current < duration:
+    # Container duration often includes audio padding past the last video frame,
+    # so stay clear of the very end.
+    last_safe = duration - 0.5
+    while current <= last_safe:
         times.append(current)
         if max_frames is not None and len(times) >= max_frames:
             break
@@ -158,9 +165,10 @@ def load_speech_segments_midpoints(stem: str, cfg: Dict) -> List[float]:
         with open(path, "r", encoding="utf-8") as handle:
             reader = csv.DictReader(handle, delimiter="\t")
             for row in reader:
+                # Whisper's TSV writer stores times as integer milliseconds.
                 try:
-                    start = float(row.get("start", "0"))
-                    end = float(row.get("end", "0"))
+                    start = float(row.get("start", "0")) / 1000.0
+                    end = float(row.get("end", "0")) / 1000.0
                 except ValueError:
                     continue
                 midpoint = start + (end - start) / 2.0
@@ -199,7 +207,8 @@ def extract_frame(
     timestamp: float,
     output_path: str,
     cfg: Dict,
-) -> None:
+) -> bool:
+    """Extract one frame; returns False if ffmpeg produced no image for this timestamp."""
     if shutil.which("ffmpeg") is None:
         raise RuntimeError("ffmpeg is required for frame extraction but was not found on PATH.")
 
@@ -227,6 +236,8 @@ def extract_frame(
     result = subprocess.run(cmd, capture_output=True, check=False)
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg failed for {media_path} @ {timestamp:.3f}s: {result.stderr.decode()}")
+    # ffmpeg exits 0 without writing anything when seeking past the last video frame.
+    return os.path.exists(output_path)
 
 
 def process_media(
@@ -275,8 +286,11 @@ def process_media(
             if os.path.exists(output_path) and not overwrite:
                 continue
 
-            extract_frame(media_path, ts, output_path, key_cfg)
-            extracted += 1
+            if extract_frame(media_path, ts, output_path, key_cfg):
+                extracted += 1
+            elif cfg.get("logging", {}).get("verbose"):
+                print(f"  no frame at {ts:.2f}s in {os.path.basename(media_path)} (past last video frame); skipped",
+                      flush=True)
 
     return extracted
 
@@ -292,7 +306,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    comm = MPI.COMM_WORLD
+    comm = get_comm()
     rank = comm.Get_rank()
     size = comm.Get_size()
 
@@ -312,17 +326,22 @@ def main() -> None:
     if rank == 0:
         media_files = discover_media_files(config)
         if not media_files:
-            sys.exit(f"No media files found in {config['input']['media_root']}.")
+            print(
+                f"No video files found in {config['input']['media_root']}; nothing to extract.",
+                flush=True,
+            )
     else:
         media_files = None
 
     media_files = comm.bcast(media_files, root=0)
+    if not media_files:
+        return
     files_for_rank = np.array_split(media_files, size)[rank]
     files_for_rank = list(files_for_rank)
 
     if rank == 0:
         print(
-            f"Starting keyframe extraction with {size} MPI ranks, "
+            f"Starting keyframe extraction with {size} process(es), "
             f"{len(media_files)} media files.",
             flush=True,
         )
@@ -363,7 +382,7 @@ def main() -> None:
         total_frames = sum(gathered_counts)
         print(
             f"Keyframe extraction complete. Generated {total_frames} frames "
-            f"across {size} ranks at {datetime.now().isoformat()}",
+            f"using {size} process(es) at {datetime.now().isoformat()}",
             flush=True,
         )
         aggregated_errors = [item for sublist in gathered_errors for item in sublist]
@@ -377,6 +396,7 @@ def main() -> None:
                     f" - {err['path']}: {err['error']}",
                     file=sys.stderr,
                 )
+        finish_stage("keyframes", total_frames, aggregated_errors, noun="videos")
 
 
 if __name__ == "__main__":

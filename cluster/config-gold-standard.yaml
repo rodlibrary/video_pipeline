@@ -1,7 +1,8 @@
 ###############################################################
 # Gold-standard configuration inspired by the AI-SummarizeVid
-# workflow. Copy this file to config.yaml and update the paths
-# (especially `input.media_root`) before running the pipeline.
+# workflow. Copy this file to cluster/config.yaml and update the
+# paths (especially `input.media_root`) before running the pipeline.
+# Relative paths are resolved against the config file's folder.
 ###############################################################
 
 input:

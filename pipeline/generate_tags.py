@@ -10,8 +10,7 @@ from typing import Dict, List, Optional, Sequence
 
 import numpy as np
 import yaml
-from mpi4py import MPI
-from openai import OpenAI
+from pipeline_common import chat_completion, create_llm_client, finish_stage, get_comm
 
 
 def expand_path(path: str) -> str:
@@ -142,19 +141,12 @@ def construct_metadata_block(metadata: Dict[str, Dict[str, str]], item_id: str, 
     return "\n".join(lines) if lines else fallback
 
 
-def create_openai_client(tagging_cfg: Dict) -> OpenAI:
-    api_key_env = tagging_cfg.get("api_key_env", "OPENAI_API_KEY")
-    api_key = os.environ.get(api_key_env)
-    if not api_key:
-        raise EnvironmentError(
-            f"Environment variable '{api_key_env}' is not set. "
-            "Set it to your OpenAI API key before running tagging.",
-        )
-    return OpenAI(api_key=api_key)
+def create_openai_client(cfg: Dict):
+    return create_llm_client(cfg, purpose="tagging")
 
 
 def tag_transcript(
-    client: OpenAI,
+    client,
     transcript_text: str,
     metadata_block: str,
     tagging_cfg: Dict,
@@ -179,20 +171,34 @@ def tag_transcript(
         ),
     )
 
-    response = client.responses.create(
-        model=tagging_cfg.get("model", "gpt-4o-mini"),
-        input=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.2,
-        max_output_tokens=800,
-        response_format={"type": "json_object"},
+    output_text = chat_completion(
+        client,
+        tagging_cfg.get("model", "gpt-4o-mini"),
+        system_prompt,
+        user_prompt,
+        temperature=tagging_cfg.get("temperature", 0.2),
+        max_tokens=tagging_cfg.get("max_output_tokens", 800),
+        json_mode=tagging_cfg.get("json_mode", True),
     )
+    return parse_json_response(output_text)
+
+
+def parse_json_response(text: str) -> Dict:
+    """Parse model JSON, tolerating Markdown code fences that some local models add."""
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else ""
+        cleaned = cleaned.rsplit("```", 1)[0]
     try:
-        return json.loads(response.output_text)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Failed to parse JSON response:\n{response.output_text}") from exc
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        start, end = cleaned.find("{"), cleaned.rfind("}")
+        if start != -1 and end > start:
+            try:
+                return json.loads(cleaned[start : end + 1])
+            except json.JSONDecodeError:
+                pass
+        raise ValueError(f"Failed to parse JSON response:\n{text}")
 
 
 def main() -> None:
@@ -206,7 +212,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    comm = MPI.COMM_WORLD
+    comm = get_comm()
     rank = comm.Get_rank()
     size = comm.Get_size()
 
@@ -246,7 +252,7 @@ def main() -> None:
 
     if rank == 0:
         print(
-            f"Starting tagging with {size} MPI ranks, "
+            f"Starting tagging with {size} process(es), "
             f"{len(transcript_files)} transcripts, "
             f"model '{tagging_cfg.get('model', 'gpt-4o-mini')}'.",
             flush=True,
@@ -301,7 +307,7 @@ def main() -> None:
         total_processed = sum(gathered_counts)
         print(
             f"Tagging complete. Generated tags for {total_processed} transcripts "
-            f"across {size} ranks at {datetime.now().isoformat()}",
+            f"using {size} process(es) at {datetime.now().isoformat()}",
             flush=True,
         )
         aggregated_errors = [item for sublist in gathered_errors for item in sublist]
@@ -315,6 +321,7 @@ def main() -> None:
                     f" - {err['path']}: {err['error']}",
                     file=sys.stderr,
                 )
+        finish_stage("tags", total_processed, aggregated_errors, noun="transcripts")
 
 
 if __name__ == "__main__":

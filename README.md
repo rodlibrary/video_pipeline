@@ -1,88 +1,66 @@
-# Parallel AV Transcription Toolkit
+# AV Pipeline Toolkit
 
-A high performance cluster configured and MPI-friendly transcription workflow designed for digital librarians, archivists, curators, and developers who manage large audiovisual collections. The toolkit builds on `https://github.com/mbutler/archive_to_access` 
+A transcription and AI-description workflow for digital librarians, archivists, curators, and developers who manage audiovisual collections. Point it at a folder of video and audio files and it produces transcripts, keyframes, optional AI summaries, tags and accessibility notes, and discovery outputs: an HTML preview, a IIIF manifest, a catalog CSV and a SQLite search index.
 
-## What this provides
-- **Parallel transcription**: Scan large audio/video collections (optional recursion) and distribute work across MPI ranks.
-- **Optional audio normalization** keeps legacy formats consistent for WhisperX ingestion.
-- **Parallel transcription** outputs `txt`, `json`, `tsv`, or `srt`.
-- **Keyframe extraction + Gemini** produces storyboard descriptions of visual content.
-- **Summaries, tags, & accessibility notes** provide layered AI metadata (text + visuals + narration cues).
-- **Collection analytics**: generate research briefings, quality reports, clustering insights, and IIIF manifests.
-- **Discovery outputs**: export catalog-ready CSV, SQLite FTS index, HTML preview dashboard.
-- **Workflow automation**: `submit_pipeline.py` sequences steps with provenance logs.
+The toolkit builds on `https://github.com/mbutler/archive_to_access`.
 
-## Steps
-1. **Install dependencies**
+## Choose how to run it
 
-  * mpi4py>=3.1
-  * whisperx (requires Hugging Face token)
-  * PyYAML>=6.0
-  * numpy>=1.24
-  * google-genai (requires API Key and tokens)
-  * scikit-learn>=1.3
-  * jinja2>=3.1
-  * pandas>=1.5
+| | [**Local**](local/README.md) | [**Cluster**](cluster/README.md) |
+| --- | --- | --- |
+| Runs on | Your laptop or workstation, from a terminal | An HPC cluster with SLURM and MPI |
+| Parallelism | One process, step by step | Each step is its own SLURM job, fanned out over MPI ranks |
+| Good for | Trying it out, small to medium collections | Large collections, GPU transcription |
+| Start with | `local/config.example.yaml` | `cluster/config.example.yaml` + `cluster/slurm/` |
 
-2. **Unzip `av_pipeline_slurm_chain.zip` alongside `run_pipeline.py` and `config.yaml`**
+Both options run the same code in [`pipeline/`](pipeline/README.md); only the configuration and the way steps are launched differ.
 
-Contents:
-* `common_env.sh`              # shared module loads, env activation, GOOGLE_API_KEY loading — sourced by every stage
-* `01_transcribe.slurm`        # GPU, 2 nodes x 1 task (one Whisper instance per GPU)
-* `02_keyframes.slurm`         # CPU, 4 nodes x 16 tasks (ffmpeg fans out cheaply)
-* `03_describe_frames.slurm`   # CPU, 2 nodes x 4 tasks (Gemini Vision — kept modest for rate limits)
-* `04_summarize.slurm`         # CPU, 1 node x 8 tasks (Gemini text)
-* `05_tags.slurm`              # CPU, 1 node x 8 tasks (Gemini text)
-* `06_accessibility.slurm`     # CPU, 1 node x 8 tasks (Gemini text)
-* `07_collection_report.slurm` # single task — not rank-aware
-* `08_preview.slurm`          # single task — no API calls
-* `09_quality_metrics.slurm`   # single task — no API calls
-* `10_iiif.slurm`              # single task — no API calls
-* `11_catalog_export.slurm`    # single task — no API calls
-* `12_search_index.slurm`      # single task — no API calls
-* `13_clustering.slurm`        # single task — Gemini embeddings, batched internally
-* `submit_pipeline.sh`         # driver: submits the chain with --dependency=afterok
+## Repository layout
 
-Configuration Overview
+```
+pipeline/     The pipeline: one script per step, plus run_pipeline.py to run them in order
+local/        Config template and instructions for running on one machine
+cluster/      Config templates, SLURM job scripts and instructions for HPC clusters
+tests/        End-to-end tests (no model downloads or API keys needed)
+requirements.txt
+```
 
-The YAML file controls several areas:
+## Pipeline steps
 
-| Section | Purpose |
-| ------- | ------- |
-| `input` | Where to find media, which extensions to include, and whether to search subdirectories. |
-| `preprocessing` | Optional audio extraction/normalization details. Disable if your media is already Whisper-ready. |
-| `transcription` | Whisper model choice, device, language hints, and decoding parameters. |
-| `outputs` | Top-level folder, output formats, and writer options shared across formats. |
-| `keyframes` | Optional still-frame extraction settings (modes, intervals, segment parsing, output layout). |
-| `frame_descriptions` | Optional Gemini settings to describe frames, with transcript and metadata context. |
-| `summarization` | Gemini summarization settings, including use of frame descriptions. |
-| `tagging` | Gemini-based entity and topic tagging of transcripts. |
-| `collection_reports` | Collection-wide synthesis reports. |
-| `accessibility` | Audio-description narration cues based on transcripts/frames. |
-| `preview_dashboard` | Static HTML preview builder. |
-| `quality_control` | Heuristic metrics and flags for QA triage. |
-| `iiif` | IIIF manifest generation parameters. |
-| `catalog_export` | CSV export options for library systems. |
-| `search_index` | SQLite full-text index settings. |
-| `clustering` | Visual theme clustering (text embeddings + k-means). |
-| `workflow` | Ordered pipeline steps for `run_pipeline.py`. |
-| `logging` | Verbosity controls and how often to print progress. |
+| Step | What it does | Needs |
+| ---- | ------------ | ----- |
+| `transcribe` | Whisper speech-to-text → `txt`, `srt`, `json`, `tsv` | ffmpeg |
+| `keyframes` | Still frames at intervals and at the middle of each speech segment | ffmpeg |
+| `describe_frames` | Vision-model description of each frame | AI model |
+| `summarize` | Short summary per item (transcript + frame descriptions) | AI model |
+| `tags` | Entities, topics, keywords as JSON | AI model |
+| `accessibility` | Audio-description style narration cues | AI model |
+| `collection_report` | One briefing across the whole collection | AI model |
+| `preview` | Static HTML dashboard | — |
+| `quality_metrics` | QA metrics and flags CSV | summaries |
+| `iiif` | IIIF manifest for the keyframes | — |
+| `catalog_export` | Catalog-ready CSV | summaries |
+| `search_index` | SQLite full-text index | summaries |
+| `clustering` | Groups frames into visual themes (embeddings + k-means) | AI model |
 
-**3. Orchestrate everything**
+The AI steps work with OpenAI, with a local model server such as Ollama or LM Studio (fully offline), or with Google Gemini through its OpenAI-compatible endpoint.
 
-`chmod +x slurm/*.sh slurm/*.slurm`
+## Quick start (local)
 
-`./slurm/submit_pipeline.sh config.yaml`
+```bash
+pip install -r requirements.txt                  # plus ffmpeg from your package manager
+cp local/config.example.yaml local/config.yaml
+mkdir local/media                                # add your video/audio files here
+python pipeline/run_pipeline.py
+```
 
-Each stage only runs after the previous one exits successfully (afterok), and each requests its own resources — GPU for transcription, wide CPU fan-out for ffmpeg, dialed-back concurrency for the Gemini API steps — instead of one job sized for the whole workflow.
+See [local/README.md](local/README.md) for details, and [cluster/README.md](cluster/README.md) for SLURM.
 
-Two extras built into the driver:
+## Tests
 
-* Skip stages you've already run: `SKIP_STEPS="transcribe keyframes" ./slurm/submit_pipeline.sh config.yaml`
-* Run only a subset: `ONLY_STEPS="describe_frames summarize" ./slurm/submit_pipeline.sh config.yaml`
+```bash
+pip install pytest
+pytest
+```
 
-A few things to tune for your actual cluster before submitting:
-
-* Partition names (`gpu`, `compute`) and module names in `common_env.sh` and each stage file are placeholders.
-*Per-stage `--nodes`/`--ntasks-per-node` are starting points — the Gemini API steps in particular should be tuned down if you hit rate limits, and `describe_frames/keyframes` sized up if your collection is large.
-* `transcription.device: "cuda"` needs to be set in `config.yaml` for the GPU request in `01_transcribe.slurm` to actually get used.
+The tests run the whole pipeline on a generated clip with Whisper inference stubbed and a fake OpenAI-compatible server, so they need ffmpeg but no model downloads or API keys.

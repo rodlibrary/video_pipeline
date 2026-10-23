@@ -10,8 +10,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import yaml
-from mpi4py import MPI
-from openai import OpenAI
+from pipeline_common import chat_completion, create_llm_client, finish_stage, get_comm
 
 
 def expand_path(path: str) -> str:
@@ -60,9 +59,10 @@ def validate_config(cfg: Dict) -> Dict:
 
     summarization_cfg["transcript_dir"] = transcript_dir
 
+    # Resolve like every other stage (relative to the working directory, which
+    # run_pipeline.py sets to the config file's folder) so downstream steps such
+    # as collection_report, preview and catalog_export find the summaries.
     output_dir = summarization_cfg.get("output_dir", "summaries")
-    if not os.path.isabs(output_dir):
-        output_dir = os.path.join(outputs_cfg["base_dir"], "..", output_dir)
     summarization_cfg["output_dir"] = expand_path(output_dir)
 
     metadata_csv = summarization_cfg.get("metadata_csv")
@@ -203,39 +203,27 @@ def build_prompt(
     }
 
 
-def create_openai_client(summarization_cfg: Dict) -> OpenAI:
-    api_key_env = summarization_cfg.get("api_key_env", "OPENAI_API_KEY")
-    api_key = os.environ.get(api_key_env)
-    if not api_key:
-        raise EnvironmentError(
-            f"Environment variable '{api_key_env}' is not set. "
-            "Set it to your OpenAI API key before running summarization.",
-        )
-    return OpenAI(api_key=api_key)
+def create_openai_client(summarization_cfg: Dict):
+    return create_llm_client(summarization_cfg, purpose="summarization")
 
 
 def summarize_transcript(
-    client: OpenAI,
+    client,
     transcript_text: str,
     metadata_block: str,
     frame_block: str,
     summarization_cfg: Dict,
 ) -> str:
     prompts = build_prompt(transcript_text, metadata_block, frame_block, summarization_cfg)
-    model = summarization_cfg.get("model", "gpt-4o-mini")
-    temperature = summarization_cfg.get("temperature", 0.2)
     word_limit = summarization_cfg.get("word_limit", 60)
-
-    response = client.responses.create(
-        model=model,
-        input=[
-            {"role": "system", "content": prompts["system"]},
-            {"role": "user", "content": prompts["user"]},
-        ],
-        max_output_tokens=word_limit * 4,
-        temperature=temperature,
+    return chat_completion(
+        client,
+        summarization_cfg.get("model", "gpt-4o-mini"),
+        prompts["system"],
+        prompts["user"],
+        temperature=summarization_cfg.get("temperature", 0.2),
+        max_tokens=summarization_cfg.get("max_output_tokens", max(word_limit * 4, 200)),
     )
-    return response.output_text.strip()
 
 
 def read_transcript(path: str, max_chars: Optional[int]) -> str:
@@ -317,7 +305,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    comm = MPI.COMM_WORLD
+    comm = get_comm()
     rank = comm.Get_rank()
     size = comm.Get_size()
 
@@ -357,7 +345,7 @@ def main() -> None:
 
     if rank == 0:
         print(
-            f"Starting summarization with {size} MPI ranks, "
+            f"Starting summarization with {size} process(es), "
             f"{len(transcript_files)} transcripts, "
             f"model '{summarization_cfg.get('model', 'gpt-4o-mini')}'.",
             flush=True,
@@ -423,7 +411,7 @@ def main() -> None:
         total_processed = sum(gathered_counts)
         print(
             f"Summarization complete. Generated {total_processed} summaries "
-            f"across {size} ranks at {datetime.now().isoformat()}",
+            f"using {size} process(es) at {datetime.now().isoformat()}",
             flush=True,
         )
         aggregated_errors = [item for sublist in gathered_errors for item in sublist]
@@ -437,6 +425,7 @@ def main() -> None:
                     f" - {err['path']}: {err['error']}",
                     file=sys.stderr,
                 )
+        finish_stage("summarize", total_processed, aggregated_errors, noun="transcripts")
 
 
 if __name__ == "__main__":

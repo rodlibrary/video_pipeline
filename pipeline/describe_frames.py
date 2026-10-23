@@ -11,8 +11,7 @@ from typing import Dict, List, Sequence, Tuple
 
 import numpy as np
 import yaml
-from mpi4py import MPI
-from openai import OpenAI
+from pipeline_common import chat_completion, create_llm_client, finish_stage, get_comm
 
 
 def expand_path(path: str) -> str:
@@ -206,19 +205,12 @@ def build_prompt(
     return {"system": system_prompt, "user": user_prompt}
 
 
-def create_openai_client(frame_cfg: Dict) -> OpenAI:
-    api_key_env = frame_cfg.get("api_key_env", "OPENAI_API_KEY")
-    api_key = os.environ.get(api_key_env)
-    if not api_key:
-        raise EnvironmentError(
-            f"Environment variable '{api_key_env}' is not set. "
-            "Set it to your OpenAI API key before running frame descriptions.",
-        )
-    return OpenAI(api_key=api_key)
+def create_openai_client(cfg: Dict):
+    return create_llm_client(cfg, purpose="frame descriptions")
 
 
 def describe_frame(
-    client: OpenAI,
+    client,
     image_b64: str,
     frame_cfg: Dict,
     metadata_block: str,
@@ -226,22 +218,18 @@ def describe_frame(
     timestamp_seconds: float,
 ) -> str:
     prompts = build_prompt(frame_cfg, metadata_block, transcript, timestamp_seconds)
-    response = client.responses.create(
-        model=frame_cfg.get("model", "gpt-4o"),
-        input=[
-            {"role": "system", "content": prompts["system"]},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompts["user"]},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
-                ],
-            },
-        ],
-        max_output_tokens=120,
+    ext = frame_cfg.get("image_extension", "jpg").lower().lstrip(".")
+    mime = "image/png" if ext == "png" else "image/webp" if ext == "webp" else "image/jpeg"
+    return chat_completion(
+        client,
+        frame_cfg.get("model", "gpt-4o"),
+        prompts["system"],
+        prompts["user"],
         temperature=frame_cfg.get("temperature", 0.2),
+        max_tokens=frame_cfg.get("max_output_tokens", 120),
+        image_b64=image_b64,
+        image_mime=mime,
     )
-    return response.output_text.strip()
 
 
 def main() -> None:
@@ -255,7 +243,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    comm = MPI.COMM_WORLD
+    comm = get_comm()
     rank = comm.Get_rank()
     size = comm.Get_size()
 
@@ -291,7 +279,7 @@ def main() -> None:
 
     if rank == 0:
         print(
-            f"Starting frame description generation with {size} MPI ranks, "
+            f"Starting frame description generation with {size} process(es), "
             f"{len(item_ids)} videos worth of keyframes, model '{frame_cfg.get('model', 'gpt-4o')}'.",
             flush=True,
         )
@@ -367,7 +355,7 @@ def main() -> None:
         total_processed = sum(gathered_counts)
         print(
             f"Frame description generation complete. Wrote {total_processed} descriptions "
-            f"across {size} ranks at {datetime.now().isoformat()}",
+            f"using {size} process(es) at {datetime.now().isoformat()}",
             flush=True,
         )
         aggregated_errors = [item for sublist in gathered_errors for item in sublist]
@@ -381,6 +369,7 @@ def main() -> None:
                     f" - {err['path']}: {err['error']}",
                     file=sys.stderr,
                 )
+        finish_stage("describe_frames", total_processed, aggregated_errors, noun="frames")
 
 
 if __name__ == "__main__":

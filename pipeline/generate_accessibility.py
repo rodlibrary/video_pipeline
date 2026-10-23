@@ -9,8 +9,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import yaml
-from mpi4py import MPI
-from openai import OpenAI
+from pipeline_common import chat_completion, create_llm_client, finish_stage, get_comm
 
 
 def expand_path(path: str) -> str:
@@ -148,19 +147,12 @@ def format_frame_descriptions(frames: List[Tuple[float, str]], cfg: Dict) -> str
     return "\n".join(lines)
 
 
-def create_openai_client(cfg: Dict) -> OpenAI:
-    api_key_env = cfg.get("api_key_env", "OPENAI_API_KEY")
-    api_key = os.environ.get(api_key_env)
-    if not api_key:
-        raise EnvironmentError(
-            f"Environment variable '{api_key_env}' is not set. "
-            "Set it to your OpenAI API key before running accessibility generation.",
-        )
-    return OpenAI(api_key=api_key)
+def create_openai_client(cfg: Dict):
+    return create_llm_client(cfg, purpose="accessibility generation")
 
 
 def generate_accessibility_note(
-    client: OpenAI,
+    client,
     transcript_text: str,
     frame_block: str,
     cfg: Dict,
@@ -184,16 +176,14 @@ def generate_accessibility_note(
         ),
     )
 
-    response = client.responses.create(
-        model=cfg.get("model", "gpt-4o-mini"),
-        input=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.2,
-        max_output_tokens=800,
+    return chat_completion(
+        client,
+        cfg.get("model", "gpt-4o-mini"),
+        system_prompt,
+        user_prompt,
+        temperature=cfg.get("temperature", 0.2),
+        max_tokens=cfg.get("max_output_tokens", 800),
     )
-    return response.output_text.strip()
 
 
 def main() -> None:
@@ -207,7 +197,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    comm = MPI.COMM_WORLD
+    comm = get_comm()
     rank = comm.Get_rank()
     size = comm.Get_size()
 
@@ -244,7 +234,7 @@ def main() -> None:
 
     if rank == 0:
         print(
-            f"Starting accessibility generation with {size} MPI ranks, "
+            f"Starting accessibility generation with {size} process(es), "
             f"{len(transcript_files)} transcripts, "
             f"model '{ac_cfg.get('model', 'gpt-4o-mini')}'.",
             flush=True,
@@ -299,7 +289,7 @@ def main() -> None:
         total_processed = sum(gathered_counts)
         print(
             f"Accessibility generation complete. Created {total_processed} notes "
-            f"across {size} ranks at {datetime.now().isoformat()}",
+            f"using {size} process(es) at {datetime.now().isoformat()}",
             flush=True,
         )
         aggregated_errors = [item for sublist in gathered_errors for item in sublist]
@@ -313,6 +303,7 @@ def main() -> None:
                     f" - {err['path']}: {err['error']}",
                     file=sys.stderr,
                 )
+        finish_stage("accessibility", total_processed, aggregated_errors, noun="transcripts")
 
 
 if __name__ == "__main__":

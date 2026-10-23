@@ -1,0 +1,11 @@
+__pycache__/
+.pytest_cache/
+.venv/
+
+# Your own configs, media and results (copy the *.example.yaml templates)
+local/config.yaml
+local/media/
+local/output/
+cluster/config.yaml
+cluster/logs/
+output/
