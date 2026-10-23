@@ -11,7 +11,7 @@ import numpy as np
 import whisper
 from whisper.utils import get_writer
 import yaml
-from mpi4py import MPI
+from pipeline_common import finish_stage, get_comm
 import subprocess
 
 
@@ -251,7 +251,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    comm = MPI.COMM_WORLD
+    comm = get_comm()
     rank = comm.Get_rank()
     size = comm.Get_size()
 
@@ -284,7 +284,7 @@ def main() -> None:
     model_name = transcription_cfg.get("model", "large-v3")
     if rank == 0:
         print(
-            f"Starting transcription with {size} MPI ranks, "
+            f"Starting transcription with {size} process(es), "
             f"{len(media_files)} media files, Whisper model '{model_name}'.",
             flush=True,
         )
@@ -336,7 +336,7 @@ def main() -> None:
         total_processed = sum(gathered_counts)
         print(
             f"Transcription complete. Processed {total_processed} files "
-            f"across {size} ranks at {datetime.now().isoformat()}",
+            f"using {size} process(es) at {datetime.now().isoformat()}",
             flush=True,
         )
         aggregated_errors = [item for sublist in gathered_errors for item in sublist]
@@ -350,6 +350,7 @@ def main() -> None:
                     f" - {err['path']}: {err['error']}",
                     file=sys.stderr,
                 )
+        finish_stage("transcribe", total_processed, aggregated_errors, noun="files")
 
 
 if __name__ == "__main__":

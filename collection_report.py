@@ -7,8 +7,7 @@ import traceback
 from typing import Dict, List, Sequence
 
 import yaml
-from mpi4py import MPI
-from openai import OpenAI
+from pipeline_common import chat_completion, create_llm_client
 
 
 def expand_path(path: str) -> str:
@@ -43,15 +42,8 @@ def validate_config(cfg: Dict) -> Dict:
     return cfg
 
 
-def create_openai_client(report_cfg: Dict) -> OpenAI:
-    api_key_env = report_cfg.get("api_key_env", "OPENAI_API_KEY")
-    api_key = os.environ.get(api_key_env)
-    if not api_key:
-        raise EnvironmentError(
-            f"Environment variable '{api_key_env}' is not set. "
-            "Set it to your OpenAI API key before running collection reports.",
-        )
-    return OpenAI(api_key=api_key)
+def create_openai_client(report_cfg: Dict):
+    return create_llm_client(report_cfg, purpose="collection reports")
 
 
 def read_text_files(directory: str, limit: int) -> Dict[str, str]:
@@ -90,7 +82,7 @@ def combine_data(summaries: Dict[str, str], tags: Dict[str, str], max_chars: int
     return data
 
 
-def generate_report(client: OpenAI, collection_data: str, report_cfg: Dict) -> str:
+def generate_report(client, collection_data: str, report_cfg: Dict) -> str:
     prompt_template = report_cfg.get(
         "prompt_template",
         "Produce a research briefing summarizing the following data:\n{collection_data}",
@@ -101,16 +93,14 @@ def generate_report(client: OpenAI, collection_data: str, report_cfg: Dict) -> s
         "You write analytical yet neutral summaries of archival audiovisual collections.",
     )
 
-    response = client.responses.create(
-        model=report_cfg.get("model", "gpt-4o-mini"),
-        input=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
+    return chat_completion(
+        client,
+        report_cfg.get("model", "gpt-4o-mini"),
+        system_prompt,
+        user_prompt,
         temperature=report_cfg.get("temperature", 0.2),
-        max_output_tokens=2000,
+        max_tokens=report_cfg.get("max_output_tokens", 2000),
     )
-    return response.output_text.strip()
 
 
 def main() -> None:

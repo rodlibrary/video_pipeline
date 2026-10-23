@@ -10,7 +10,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 
 import yaml
-from openai import OpenAI
+from pipeline_common import create_llm_client, embed_texts
 
 
 def expand_path(path: str) -> str:
@@ -52,15 +52,8 @@ def validate_config(cfg: Dict) -> Dict:
     return cfg
 
 
-def create_openai_client(cluster_cfg: Dict) -> OpenAI:
-    api_key_env = cluster_cfg.get("api_key_env", "OPENAI_API_KEY")
-    api_key = os.environ.get(api_key_env)
-    if not api_key:
-        raise EnvironmentError(
-            f"Environment variable '{api_key_env}' is not set. "
-            "Set it to your OpenAI API key before running clustering.",
-        )
-    return OpenAI(api_key=api_key)
+def create_openai_client(cluster_cfg: Dict):
+    return create_llm_client(cluster_cfg, purpose="clustering")
 
 
 def gather_descriptions(cluster_cfg: Dict) -> List[Tuple[str, str, str]]:
@@ -79,21 +72,14 @@ def gather_descriptions(cluster_cfg: Dict) -> List[Tuple[str, str, str]]:
     return entries
 
 
-def embed_descriptions(client: OpenAI, descriptions: List[str], cluster_cfg: Dict) -> np.ndarray:
+def embed_descriptions(client, descriptions: List[str], cluster_cfg: Dict) -> np.ndarray:
     model = cluster_cfg.get("model", "text-embedding-3-small")
-    embeddings = []
-    batch_size = 100
-    for start in range(0, len(descriptions), batch_size):
-        batch = descriptions[start : start + batch_size]
-        response = client.embeddings.create(model=model, input=batch)
-        embeddings.extend([data.embedding for data in response.data])
-    return np.array(embeddings)
+    return np.array(embed_texts(client, model, descriptions))
 
 
 def perform_clustering(embeddings: np.ndarray, cluster_cfg: Dict) -> KMeans:
     n_clusters = min(cluster_cfg.get("n_clusters", 20), len(embeddings))
-    if n_clusters < 2:
-        n_clusters = 2
+    n_clusters = max(n_clusters, 2)
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
     kmeans.fit(embeddings)
     return kmeans
@@ -144,6 +130,9 @@ def main() -> None:
     entries = gather_descriptions(cluster_cfg)
     if not entries:
         sys.exit("No frame descriptions found for clustering.")
+    if len(entries) < 2:
+        print("Only one frame description found; clustering needs at least two. Skipping.")
+        return
 
     client = create_openai_client(cluster_cfg)
     embeddings = embed_descriptions(client, [entry[2] for entry in entries], cluster_cfg)

@@ -8,6 +8,8 @@ from typing import Dict, List, Optional
 
 import yaml
 
+from pipeline_common import transcript_dir_for
+
 
 def expand_path(path: str) -> str:
     return os.path.abspath(os.path.expanduser(path))
@@ -37,10 +39,8 @@ def validate_config(cfg: Dict) -> Dict:
     if transcript_dir:
         export_cfg["transcript_dir"] = expand_path(transcript_dir)
     else:
-        outputs_cfg = cfg.get("outputs", {})
-        format_dirs = outputs_cfg.get("format_dirs", {})
         transcript_format = export_cfg.get("transcript_format", "txt")
-        export_cfg["transcript_dir"] = expand_path(format_dirs.get(transcript_format, "")) if format_dirs else None
+        export_cfg["transcript_dir"] = transcript_dir_for(cfg, transcript_format)
 
     metadata_csv = cfg.get("summarization", {}).get("metadata_csv") or cfg.get("tagging", {}).get("metadata_csv")
     if metadata_csv:

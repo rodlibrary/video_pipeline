@@ -10,6 +10,8 @@ import pandas as pd
 
 import yaml
 
+from pipeline_common import transcript_dir_for
+
 
 def expand_path(path: str) -> str:
     return os.path.abspath(os.path.expanduser(path))
@@ -38,10 +40,8 @@ def validate_config(cfg: Dict) -> Dict:
     if transcript_dir:
         qc_cfg["transcript_dir"] = expand_path(transcript_dir)
     else:
-        outputs_cfg = cfg.get("outputs", {})
-        format_dirs = outputs_cfg.get("format_dirs", {})
         transcript_format = qc_cfg.get("transcript_format", "txt")
-        qc_cfg["transcript_dir"] = expand_path(format_dirs.get(transcript_format, "")) if format_dirs else None
+        qc_cfg["transcript_dir"] = transcript_dir_for(cfg, transcript_format)
 
     if qc_cfg.get("frame_descriptions_dirs"):
         qc_cfg["frame_descriptions_dirs"] = [

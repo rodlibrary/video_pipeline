@@ -1,9 +1,10 @@
-mpi4py>=3.1
-openai-whisper>=20240930
+# Core (needed for the local, single-machine pipeline)
+openai-whisper>=20240930   # speech-to-text; installs PyTorch
 PyYAML>=6.0
 numpy>=1.24
-openai>=1.40
-scikit-learn>=1.3
-jinja2>=3.1
-pandas>=1.5
+openai>=1.40               # OpenAI or any OpenAI-compatible server (Ollama, LM Studio, Gemini)
+scikit-learn>=1.3          # clustering step
+jinja2>=3.1                # HTML preview step
+pandas>=1.5                # quality metrics step
 
+# Optional, cluster only: `pip install mpi4py` and run with `run_pipeline.py --mpi`
