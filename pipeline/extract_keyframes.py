@@ -218,24 +218,32 @@ def extract_frame(
 
     cmd = [
         "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
         "-y",
         "-ss",
         f"{timestamp:.3f}",
         "-i",
         media_path,
+        "-an",
         "-frames:v",
         "1",
     ]
     if image_ext.lower() in {"jpg", "jpeg"}:
         cmd.extend(["-qscale:v", str(jpeg_quality)])
     cmd.extend(additional_args)
-    cmd.append(output_path)
+    # Writing one image to a plain file name (no %d pattern) needs -update 1 on
+    # recent ffmpeg; older versions accept the flag too.
+    cmd.extend(["-update", "1", output_path])
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     result = subprocess.run(cmd, capture_output=True, check=False)
     if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg failed for {media_path} @ {timestamp:.3f}s: {result.stderr.decode()}")
+        raise RuntimeError(
+            f"ffmpeg failed for {media_path} @ {timestamp:.3f}s: {result.stderr.decode(errors='replace').strip()}",
+        )
     # ffmpeg exits 0 without writing anything when seeking past the last video frame.
     return os.path.exists(output_path)
 
