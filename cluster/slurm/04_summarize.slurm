@@ -4,7 +4,6 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8                 # AI text API calls: tune to your quota
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=8G
 #SBATCH --time=04:00:00
 #SBATCH --output=logs/04-summarize-%j.out
 #SBATCH --error=logs/04-summarize-%j.err

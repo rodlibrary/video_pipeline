@@ -4,7 +4,6 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1                          # not rank-aware; must run as a single process
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=4G
 #SBATCH --time=00:30:00
 #SBATCH --output=logs/11-catalog_export-%j.out
 #SBATCH --error=logs/11-catalog_export-%j.err

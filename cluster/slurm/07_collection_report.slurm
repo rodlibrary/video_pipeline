@@ -4,7 +4,6 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1                          # not rank-aware; must run as a single process
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=8G
 #SBATCH --time=01:00:00
 #SBATCH --output=logs/07-collection_report-%j.out
 #SBATCH --error=logs/07-collection_report-%j.err

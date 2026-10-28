@@ -2,14 +2,18 @@
 
 Each pipeline step is submitted as its own SLURM job, chained with `--dependency=afterok` so a step only starts after the previous one succeeds. Each job requests its own resources: GPUs for transcription, wide CPU fan-out for ffmpeg, modest concurrency for the AI API steps. Within a job, the rank-aware steps split their files across MPI ranks.
 
+The job scripts are set up for **UNI's HPC cluster** (partition `defq`, Python environment in `/data/<catID>/pve`, no memory or GPU requests). For another cluster, see [Other clusters](#other-clusters).
+
 ```
 cluster/
 ├── config.example.yaml        # template; copy to config.yaml
 ├── config-gold-standard.yaml  # fuller example inspired by AI-SummarizeVid
+├── cluster_env.sh             # partition / memory / GPU settings for UNI's cluster; loaded by submit_pipeline.sh
+├── cluster_env.example.sh     # template for other clusters
 └── slurm/
     ├── common_env.sh              # module loads, environment activation, API keys — sourced by every job
     ├── submit_pipeline.sh         # submits the whole chain
-    ├── 01_transcribe.slurm        # GPU, 2 nodes x 1 task (one Whisper instance per GPU)
+    ├── 01_transcribe.slurm        # 2 nodes x 1 task (GPU only when USE_GPU=1)
     ├── 02_keyframes.slurm         # CPU, 4 nodes x 16 tasks (ffmpeg fans out cheaply)
     ├── 03_describe_frames.slurm   # CPU, 2 nodes x 4 tasks (vision API — modest for rate limits)
     ├── 04_summarize.slurm         # CPU, 1 node x 8 tasks (text API)
@@ -24,18 +28,19 @@ cluster/
     └── 13_clustering.slurm        # single task, embeddings batched internally
 ```
 
-## 1. Set up the environment
+## 1. Set up the environment (once)
 
-On a login node, create an environment with the dependencies plus `mpi4py`, built against your cluster's MPI:
+Clone this repository into your HPC directory, then, on a login node, create the Python environment that `common_env.sh` activates (`/data/<catID>/pve`), built against the cluster's MPI:
 
 ```bash
-module load openmpi miniconda3        # names vary by cluster
-conda create -n av-toolkit python=3.11 -y
-source activate av-toolkit
-pip install -r requirements.txt mpi4py
+export TMPDIR="/home/$USER/data/tmp"
+mkdir -p $TMPDIR
+module load python3.11 openmpi/gcc/64/4.1.8
+python -m venv /data/$USER/pve
+/data/$USER/pve/bin/pip install -r requirements.txt mpi4py
 ```
 
-Then edit `cluster/slurm/common_env.sh` so its `module load` lines and environment activation match your cluster.
+ffmpeg is already installed at `/usr/bin/ffmpeg`, so it needs no module.
 
 **API keys.** Store keys in files only you can read; `common_env.sh` exports them for every job:
 
@@ -55,17 +60,23 @@ cp cluster/config.example.yaml cluster/config.yaml
 ```
 
 - Set `input.media_root`, preferably to an absolute path on a shared filesystem.
-- Set `transcription.device: "cuda"` so the GPU requested by `01_transcribe.slurm` is actually used.
+- Set `transcription.device: "cpu"`. On UNI's cluster transcription runs on `defq` without a GPU (`USE_GPU=0` in `cluster_env.sh`). If you turn on `USE_GPU=1` on a cluster with Slurm-visible GPUs, set it to `"cuda"`.
 - Set `enabled: true` on the steps you want. Disabled steps exit immediately inside their job without failing the chain; use `SKIP_STEPS` to avoid queueing them at all.
 - Relative paths are resolved against the config file's folder (`cluster/`).
 
-## 3. Tune the job scripts
+## 3. Cluster settings
 
-Before submitting, review for your cluster:
+`submit_pipeline.sh` loads `cluster/cluster_env.sh` and adds the matching `--partition`, `--mem` and `--gres` flags to every job, so the `#SBATCH --partition` lines in the `.slurm` files are only placeholders. For UNI it sets:
 
-- Partition names (`gpu`, `compute`) and module names are placeholders.
-- `--nodes` / `--ntasks-per-node` per stage are starting points. Turn the AI steps down if you hit API rate limits; size up `keyframes` and `describe_frames` for large collections.
-- `--time` and `--mem` per stage.
+| Setting | UNI value | Why |
+|---|---|---|
+| `CPU_PARTITION` | `defq` | Partition for every stage |
+| `CPU_MEM`, `GPU_MEM` | empty | The cluster doesn't track memory (`RealMemory=1`), so any `--mem` request is rejected |
+| `USE_GPU` | `0` | The `gpuq` nodes don't register GPUs with Slurm (`Gres=(null)`), so transcription runs on `defq` |
+
+Values set on the command line win, e.g. `CPU_MEM=32G cluster/slurm/submit_pipeline.sh`. Each submitted `sbatch` command is printed so you can check the flags.
+
+`--nodes` / `--ntasks-per-node` per stage are starting points. Turn the AI steps down if you hit API rate limits; size up `keyframes` and `describe_frames` for large collections. `--time` is set per stage in the `.slurm` files.
 
 ## 4. Submit
 
@@ -95,5 +106,11 @@ python pipeline/run_pipeline.py --config cluster/config.yaml --mpi --ranks 16
 ```
 
 Each step appends a provenance record (commands, timings, exit codes) to the log set by `provenance.log_path`.
+
+## Other clusters
+
+1. Copy `cluster/cluster_env.example.sh` over `cluster/cluster_env.sh` and fill in your partitions, memory and GPU request (from `sinfo -s` and `sinfo -o "%P %D %c %m %G"`).
+2. Edit the `module load` lines and the environment activation in `cluster/slurm/common_env.sh`.
+3. If your cluster has Slurm-visible GPUs, set `USE_GPU=1` and `transcription.device: "cuda"`.
 
 See [../pipeline/README.md](../pipeline/README.md) for the full configuration reference.
