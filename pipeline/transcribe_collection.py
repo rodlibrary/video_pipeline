@@ -137,6 +137,9 @@ def normalize_audio(
     channels = str(preprocess_cfg.get("channels", 1))
     ffmpeg_cmd = [
         "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
         "-y",
         "-i",
         media_path,

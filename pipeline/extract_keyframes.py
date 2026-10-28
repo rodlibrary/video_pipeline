@@ -218,24 +218,47 @@ def extract_frame(
 
     cmd = [
         "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
         "-y",
         "-ss",
         f"{timestamp:.3f}",
         "-i",
         media_path,
+        "-an",
         "-frames:v",
         "1",
     ]
     if image_ext.lower() in {"jpg", "jpeg"}:
-        cmd.extend(["-qscale:v", str(jpeg_quality)])
+        # JPEG stores full-range colour. Video is usually limited range, which
+        # ffmpeg 8's JPEG encoder rejects (older versions converted silently),
+        # so convert explicitly.
+        cmd.extend([
+            "-vf", "scale=out_range=full",
+            "-pix_fmt", "yuv420p",
+            "-color_range", "pc",
+            "-qscale:v", str(jpeg_quality),
+            # ffmpeg 8's frame-threaded JPEG encoder does not pass the colour
+            # range to its worker threads and then rejects the input; one frame
+            # needs no encoder threads anyway.
+            "-threads", "1",
+        ])
     cmd.extend(additional_args)
-    cmd.append(output_path)
+    # Writing one image to a plain file name (no %d pattern) needs -update 1 on
+    # recent ffmpeg; older versions accept the flag too.
+    cmd.extend(["-update", "1", output_path])
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     result = subprocess.run(cmd, capture_output=True, check=False)
+    stderr = result.stderr.decode(errors="replace")
+    if result.returncode != 0 and not os.path.exists(output_path) and "received no packets" in stderr:
+        return False  # timestamp past the last video frame (ffmpeg 7+ reports this as an error)
     if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg failed for {media_path} @ {timestamp:.3f}s: {result.stderr.decode()}")
+        raise RuntimeError(
+            f"ffmpeg failed for {media_path} @ {timestamp:.3f}s: {stderr.strip()}",
+        )
     # ffmpeg exits 0 without writing anything when seeking past the last video frame.
     return os.path.exists(output_path)
 
@@ -246,19 +269,20 @@ def process_media(
     stem: str,
 ) -> int:
     key_cfg = cfg["keyframes"]
-    media_root = cfg["input"]["media_root"]
     overwrite = key_cfg.get("overwrite", False)
     modes = key_cfg.get("modes", [])
 
     timestamps: List[float] = []
     mode_timestamp_map: Dict[str, List[float]] = {}
+    duration = ffprobe_duration_seconds(media_path)
     if "interval" in modes:
-        duration = ffprobe_duration_seconds(media_path)
         interval_times = generate_interval_timestamps(duration, key_cfg)
         timestamps.extend(interval_times)
         mode_timestamp_map["interval"] = interval_times
     if "speech_segments" in modes:
-        speech_times = load_speech_segments_midpoints(stem, key_cfg)
+        # A segment can end at the very end of the audio track, which may run
+        # slightly longer than the video; keep frames inside the video.
+        speech_times = [t for t in load_speech_segments_midpoints(stem, key_cfg) if t < duration - 0.25]
         timestamps.extend(speech_times)
         mode_timestamp_map["speech_segments"] = speech_times
 
