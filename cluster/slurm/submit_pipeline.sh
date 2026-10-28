@@ -20,6 +20,13 @@
 #
 # Steps disabled in the config are skipped by run_pipeline.py inside the job,
 # so their jobs finish in seconds; use SKIP_STEPS to avoid queueing them.
+#
+# Partitions, memory and GPUs: the .slurm files only carry placeholder
+# partitions and request no --mem or --gres. This script loads
+# cluster/cluster_env.sh (set up for UNI's cluster) and adds the matching
+# sbatch flags to every job. Override any value on the command line:
+#   CPU_PARTITION=batch CPU_MEM=32G cluster/slurm/submit_pipeline.sh
+#   USE_GPU=1 GPU_PARTITION=gpu GPU_GRES=gpu:1 cluster/slurm/submit_pipeline.sh
 #===============================================================================
 
 set -euo pipefail
@@ -44,22 +51,35 @@ export AV_SLURM_DIR="${SCRIPT_DIR}"
 export AV_CLUSTER_DIR="${CLUSTER_DIR}"
 export AV_PIPELINE_DIR="${REPO_DIR}/pipeline"
 
-# Ordered list of (step_name, script_file) pairs, matching the step order in
-# pipeline/run_pipeline.py.
+# Cluster resource settings. Command-line values win over cluster_env.sh.
+if [[ -f "${CLUSTER_DIR}/cluster_env.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${CLUSTER_DIR}/cluster_env.sh"
+fi
+CPU_PARTITION="${CPU_PARTITION:-}"
+GPU_PARTITION="${GPU_PARTITION:-}"
+CPU_MEM="${CPU_MEM:-}"
+GPU_MEM="${GPU_MEM:-}"
+GPU_GRES="${GPU_GRES:-gpu:1}"
+USE_GPU="${USE_GPU:-1}"   # 0 = run transcribe on CPU_PARTITION with no --gres
+
+# Ordered list of step_name:script_file:resource_class, matching the step
+# order in pipeline/run_pipeline.py. resource_class is "gpu" for the one
+# stage that can use a GPU and "cpu" for everything else.
 STEPS=(
-    "transcribe:01_transcribe.slurm"
-    "keyframes:02_keyframes.slurm"
-    "describe_frames:03_describe_frames.slurm"
-    "summarize:04_summarize.slurm"
-    "tags:05_tags.slurm"
-    "accessibility:06_accessibility.slurm"
-    "collection_report:07_collection_report.slurm"
-    "preview:08_preview.slurm"
-    "quality_metrics:09_quality_metrics.slurm"
-    "iiif:10_iiif.slurm"
-    "catalog_export:11_catalog_export.slurm"
-    "search_index:12_search_index.slurm"
-    "clustering:13_clustering.slurm"
+    "transcribe:01_transcribe.slurm:gpu"
+    "keyframes:02_keyframes.slurm:cpu"
+    "describe_frames:03_describe_frames.slurm:cpu"
+    "summarize:04_summarize.slurm:cpu"
+    "tags:05_tags.slurm:cpu"
+    "accessibility:06_accessibility.slurm:cpu"
+    "collection_report:07_collection_report.slurm:cpu"
+    "preview:08_preview.slurm:cpu"
+    "quality_metrics:09_quality_metrics.slurm:cpu"
+    "iiif:10_iiif.slurm:cpu"
+    "catalog_export:11_catalog_export.slurm:cpu"
+    "search_index:12_search_index.slurm:cpu"
+    "clustering:13_clustering.slurm:cpu"
 )
 
 SKIP_STEPS="${SKIP_STEPS:-}"
@@ -82,8 +102,7 @@ prev_jobid=""
 submitted_any=0
 
 for entry in "${STEPS[@]}"; do
-    step="${entry%%:*}"
-    script="${entry##*:}"
+    IFS=':' read -r step script resource_class <<< "${entry}"
 
     if ! should_run "${step}"; then
         echo "Skipping ${step} (${script})"
@@ -94,6 +113,15 @@ for entry in "${STEPS[@]}"; do
     if [[ -n "${prev_jobid}" ]]; then
         sbatch_args+=(--dependency=afterok:"${prev_jobid}")
     fi
+    if [[ "${resource_class}" == "gpu" && "${USE_GPU}" != "0" ]]; then
+        [[ -n "${GPU_PARTITION}" ]] && sbatch_args+=(--partition="${GPU_PARTITION}")
+        [[ -n "${GPU_MEM}" ]] && sbatch_args+=(--mem="${GPU_MEM}")
+        [[ -n "${GPU_GRES}" ]] && sbatch_args+=(--gres="${GPU_GRES}")
+    else
+        [[ -n "${CPU_PARTITION}" ]] && sbatch_args+=(--partition="${CPU_PARTITION}")
+        [[ -n "${CPU_MEM}" ]] && sbatch_args+=(--mem="${CPU_MEM}")
+    fi
+    echo "+ sbatch ${sbatch_args[*]} ${script}" >&2
     jobid=$(sbatch "${sbatch_args[@]}" "${SCRIPT_DIR}/${script}" "${CONFIG}")
 
     echo "Submitted ${step} (${script}) as job ${jobid}$( [[ -n "${prev_jobid}" ]] && echo " (after ${prev_jobid})")"

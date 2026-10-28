@@ -4,7 +4,6 @@
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=16                # ffmpeg is cheap per-frame; scale out on CPU
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=48G
 #SBATCH --time=04:00:00
 #SBATCH --output=logs/02-keyframes-%j.out
 #SBATCH --error=logs/02-keyframes-%j.err

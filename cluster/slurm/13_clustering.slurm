@@ -4,7 +4,6 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1                          # not rank-aware; must run as a single process
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=16G
 #SBATCH --time=02:00:00
 #SBATCH --output=logs/13-clustering-%j.out
 #SBATCH --error=logs/13-clustering-%j.err

@@ -4,7 +4,6 @@
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=4                 # AI vision API calls: keep concurrency modest, tune to your quota
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=16G
 #SBATCH --time=08:00:00
 #SBATCH --output=logs/03-describe-frames-%j.out
 #SBATCH --error=logs/03-describe-frames-%j.err

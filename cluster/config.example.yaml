@@ -10,7 +10,7 @@
 #
 # Every section except transcription is off by default; set `enabled: true`
 # on the steps you want. Steps left disabled are skipped automatically.
-# Set transcription.device: "cuda" so 01_transcribe.slurm's GPU is used.
+# On UNI's cluster set transcription.device: "cpu" (USE_GPU=0 in cluster_env.sh); use "cuda" only with USE_GPU=1.
 ###############################################################################
 
 # Where to find media and which files to include

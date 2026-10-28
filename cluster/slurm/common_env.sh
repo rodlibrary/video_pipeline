@@ -4,8 +4,8 @@
 #
 # Sourced (not executed) by every stage script in this directory. Keeps
 # module loads, environment activation, and credential handling in one
-# place instead of thirteen. Adjust module names / env activation for your
-# cluster.
+# place instead of thirteen. The module names and environment path below
+# are set for UNI's HPC cluster; adjust them for other clusters.
 #
 # Expects these variables, which submit_pipeline.sh exports for every job:
 #   AV_PIPELINE_DIR  absolute path to the repository's pipeline/ folder
@@ -18,11 +18,12 @@ set -euo pipefail
 : "${AV_CLUSTER_DIR:?Submit jobs with cluster/slurm/submit_pipeline.sh}"
 
 module purge
-module load openmpi/4.1          # OpenMPI build with SLURM/PMI support
-module load ffmpeg/6.0
-module load miniconda3/latest
+module load openmpi/gcc/64/4.1.8  # UNI: confirmed via `module avail openmpi`
+# UNI: ffmpeg is at /usr/bin/ffmpeg (already on PATH), so no module is needed.
+# UNI: there is no conda/miniconda module, so activate the venv directly.
+# Other clusters: e.g. `module load ffmpeg/6.0 miniconda3` and `source activate av-toolkit`.
 
-source activate av-toolkit        # or: source /path/to/.venv/bin/activate
+source "/data/${USER}/pve/bin/activate"
 
 # --- API credentials ---------------------------------------------------------
 # Never hardcode secrets. Store keys in files only you can read (chmod 600).
